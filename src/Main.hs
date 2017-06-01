@@ -46,6 +46,7 @@ _FILE_PATH = "database/hh-json/"
 
 
 
+
 testHandIDData = C.pack "[{\"id\":\"592b343035a9080c68e768f6\",\"label\":\"28 (23:33)\",\"table\":\"Learning - Advanced 3 \"},{\"id\":\"592b33ee56a9083326fc42fa\",\"label\":\"28 (23:32)\",\"table\":\"Learning - Advanced 3 \"}]"
 
 testPlayer = C.pack "{\"id\":\"2907539\",\"name\":\"Gusdi Darmawan\",\"fid\":\"676527835866370\",\"cards\":[\"http://adv3.fbtrnpkr.info/kartlar/51.png\",\"http://adv3.fbtrnpkr.info/kartlar/18.png\"],\"image\":\"https://graph.facebook.com/676527835866370/picture\",\"actions\":[[{\"type\":\"BLIND\",\"chip\":50},{\"type\":\"CALL\",\"chip\":100},{\"type\":\"CALL\",\"chip\":\"3.23 K\"}]],\"chip\":\"3.23 K\",\"won\":false,\"onTheGame\":true}"
@@ -73,7 +74,7 @@ reqHandActions hID = do
 
 writeHandActionsUnparsedJSON :: HandID -> IO ()
 writeHandActionsUnparsedJSON hID =
-    let file = _FILE_PATH ++ (HandID.handID hID) ++(HandID.label (fixLabel hID)) ++  ".txt"
+    let file = _FILE_PATH ++ (HandID.handID hID) ++(HandID.label (fixHandID hID)) ++  ".txt"
     in do
         n <- doesFileExist (file)
         case n of
@@ -92,40 +93,40 @@ writeLatest25Hands = do
 -- readHand :: IO (Either String HandActions)
 -- readHand :: IO (Either String [String])
 readHand = do
-    f <- fmap (head . (drop 7)) (listDirectory _FILE_PATH)
-    r <- fmap C.pack (readFile (_FILE_PATH ++ f))
---     return r
-    let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
-        fixed = fmap fixHandActions decoded
-        hh = fmap handToHH fixed
-    return (showEither hh)
+    fileName <- fmap (head . (drop 3)) (listDirectory _FILE_PATH)
+    r <- fmap C.pack (readFile (_FILE_PATH ++ fileName))
+    return r
+--     let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
+--         fixed = fmap fixHandActions decoded
+--         hh = fmap (handToHH (parseTempFileNameID fileName)(parseTempFileNameDate fileName)) fixed
+--     return (showEither hh)
 
 
 
 -- handToHH :: HandActions -> String
-handToHH (HandActions ps c1 c2 c3 c4 c5) = do
+handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
     if length ps >= 3
         then [(show (length ps)) ++ " players - too many players"]
     else let sb = head $ List.filter isSB ps
              bb = head $ List.filter isBB ps
              seat1 = head ps
              seat2 = last ps
-             preflopSBActions = playersChipActionsOfStreet sb 0
-             preflopBBActions = playersChipActionsOfStreet bb 0
-             preFlopAction = fmap (drop 2) (mergeMaybeList preflopSBActions preflopBBActions)
-             s = [ "Seat 1: " ++ (screenName seat1) ++ " ($" ++ (show (stack seat1)) ++ ")"
+             s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (blind sb) ++ "$/" ++ show (blind bb) ++ "$) - " ++ date
+                 , "Table: " ++ (tableFromBB (blind bb)) ++ "5-max (real money) Seat #" ++ (show (seatOfSB ps))
+                 , "Seat 1: " ++ (screenName seat1) ++ " ($" ++ (show (stack seat1)) ++ ")"
                  , "Seat 2: " ++ (screenName seat2) ++ " ($" ++ (show (stack seat2)) ++ ")"
-                 , (screenName sb) ++ " posts the small blind of $" ++ (show (blind sb))
-                 , (screenName bb) ++ " posts the big blind of $" ++ (show (blind bb))
-                 , "The button is in seat #" ++ (show (seatOfSB ps))
-                 , "*** HOLE CARDS ***"
+                 , "*** ANTE/BLINDS ***"
+                 , (screenName sb) ++ " posts small blind $" ++ (show (blind sb))
+                 , (screenName bb) ++ " posts big blind $" ++ (show (blind bb))
+                 , "*** PRE-FLOP ***"
                  , "Dealt to " ++ (screenName (hero ps)) ++ " " ++ (hhCards (cards (hero ps)))
---                  , "PREFLOP:  " ++ (showMaybe (fmap showStreetActions preFlopAction))
+--                  , "PRE-FLOP:  " ++ (showMaybe (fmap showStreetActions preFlopAction))
                  , (showStreetActions bb sb [c1,c2,c3,c4,c5] 0)
                  , (showStreetActions bb sb [c1,c2,c3,c4,c5] 1)
                  , (showStreetActions bb sb [c1,c2,c3,c4,c5] 2)
                  , (showStreetActions bb sb [c1,c2,c3,c4,c5] 3)
                  , "*** SUMMARY ***"
+
                  , "Total pot $" ++ " | Rake $0"
                  ]
          in s

@@ -25,10 +25,10 @@ showStreetChipActions xs = foldl (\str tuple -> str ++ (showChipActionWithScreen
 showChipActionWithScreenName :: (String, ChipAction) -> String
 showChipActionWithScreenName (s, action) = s ++ " " ++ (showChipAction action)
 
-showChipAction (Blind 50000000) = "posts the small blind of $50000000"
-showChipAction (Blind 100000000) = "posts the big blind of $100000000"
-showChipAction (Blind 20000000) = "posts the small blind of $20000000"
-showChipAction (Blind 40000000) = "posts the big blind of $40000000"
+showChipAction (Blind 50) = "posts the small blind of $50"
+showChipAction (Blind 100) = "posts the big blind of $100"
+showChipAction (Blind 200) = "posts the small blind of $20"
+showChipAction (Blind 40) = "posts the big blind of $40"
 showChipAction (Allin n) = "raises to $" ++ (show n)
 showChipAction (Raise n) = "raises to $" ++ (show n)
 showChipAction (Call n) = "calls $" ++ (show n)
@@ -48,10 +48,9 @@ parseChipString "" = 0
 parseChipString s =
     let amt = init (init s) in
     case last s of
-      'B' -> floor $ (read amt :: Double) * 1000000000
-      'M' -> floor $ (read amt :: Double) * 1000000
-      'K' -> floor $ (read amt :: Double) * 1000
-      _   -> read s :: Integer
+      'B' -> floor $ (read amt :: Double) * 1000
+      'M' -> floor $ (read amt :: Double)
+      _   -> 1
 
 showInt :: Int -> String
 showInt = show
@@ -79,8 +78,8 @@ fixCalls (x1: (Call c) : xs) = case x1 of
     (Blind b) -> case (c - b) of
         0 -> x1 : Check : (fixCalls xs)
         d -> x1 : (Call d): (fixCalls xs)
-    (Raise b) -> case (c - b) of
-        0 -> x1 : Check : (fixCalls xs)
-        d -> x1 : (Call d): (fixCalls xs)
+--     (Raise b) -> case (c - b) of   // don't know why I needed this case (doesn't make sense to me now)
+--         0 -> x1 : Check : (fixCalls xs)
+--         d -> x1 : (Call d): (fixCalls xs)
     _ -> x1 : (Call c): (fixCalls xs)
 fixCalls (x1 : x2) = x1 : fixCalls x2

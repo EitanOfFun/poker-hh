@@ -82,14 +82,14 @@ blind p = case head (head (chipActions p)) of
 
 isSB :: Player -> Bool
 isSB p = case head (head (chipActions p)) of
-    (Blind 50000000) -> True
-    (Blind 20000000) -> True
+    (Blind 50) -> True
+    (Blind 20) -> True
     _ -> False
 
 isBB :: Player -> Bool
 isBB p = case head (head (chipActions p)) of
-    (Blind 100000000 ) -> True
-    (Blind 40000000) -> True
+    (Blind 100 ) -> True
+    (Blind 40) -> True
     _ -> False
 
 screenName :: Player -> String
