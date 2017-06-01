@@ -8,6 +8,7 @@ import Control.Applicative
 import Control.Monad
 import qualified Data.Vector as V
 import qualified Data.HashMap.Lazy as HML        ( lookup )
+import Data.List as L
 
 data ChipAction =
     Blind Integer
@@ -17,6 +18,24 @@ data ChipAction =
   | Check
   | Fold
   deriving (Eq, Show)
+
+showStreetChipActions :: [(String, ChipAction)] -> String
+showStreetChipActions xs = foldl (\str tuple -> str ++ (showChipActionWithScreenName tuple) ++ "\n") "" xs
+
+showChipActionWithScreenName :: (String, ChipAction) -> String
+showChipActionWithScreenName (s, action) = s ++ " " ++ (showChipAction action)
+
+showChipAction (Blind 50000000) = "posts the small blind of $50000000"
+showChipAction (Blind 100000000) = "posts the big blind of $100000000"
+showChipAction (Blind 20000000) = "posts the small blind of $20000000"
+showChipAction (Blind 40000000) = "posts the big blind of $40000000"
+showChipAction (Allin n) = "raises to $" ++ (show n)
+showChipAction (Raise n) = "raises to $" ++ (show n)
+showChipAction (Call n) = "calls $" ++ (show n)
+showChipAction Check = "checks"
+showChipAction Fold = "folds"
+showChipAction (Blind b) = "ERROR: Blind " ++ (show b) ++ " not supported"
+
 
 
 parseChipActions :: Maybe Value -> Parser [ChipAction]
@@ -50,3 +69,18 @@ instance FromJSON ChipAction where
   parseJSON _ = mzero
 
 
+-- postFlopAction :: [ChipAction] -> [(String, ChipAction)]
+-- postFlopAction ps 0 = fixPreflopBug
+
+
+fixCalls :: [ChipAction] -> [ChipAction]
+fixCalls [] = []
+fixCalls (x1: (Call c) : xs) = case x1 of
+    (Blind b) -> case (c - b) of
+        0 -> x1 : Check : (fixCalls xs)
+        d -> x1 : (Call d): (fixCalls xs)
+    (Raise b) -> case (c - b) of
+        0 -> x1 : Check : (fixCalls xs)
+        d -> x1 : (Call d): (fixCalls xs)
+    _ -> x1 : (Call c): (fixCalls xs)
+fixCalls (x1 : x2) = x1 : fixCalls x2

@@ -25,7 +25,7 @@ data HandActions = HandActions
   , flop_2 :: !(Maybe Card)
   , turn :: !(Maybe Card)
   , river :: !(Maybe Card)
-  } deriving (Show)
+  } deriving (Show, Eq)
 
 fixHandActions :: HandActionsResp -> HandActions
 fixHandActions (HandActionsResp h1 h2 h3 h4 h5 h6) = HandActions

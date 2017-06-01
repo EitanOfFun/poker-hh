@@ -64,3 +64,9 @@ indexToCard i
 -- exampleCardUrl = C.pack "http://adv3.fbtrnpkr.info/kartlar/0.png"
 
 
+hhCards :: [Maybe Card] -> String
+hhCards ((Just c1):(Just c2):[]) = "[" ++ (show c1) ++ " " ++ (show c2) ++ "]"
+hhCards ((Just c1):(Just c2):(Just c3):[]) = "[" ++ (show c1) ++ " " ++ (show c2) ++ " " ++ (show c3) ++ "]"
+hhCards ((Just c1):(Just c2):(Just c3):(Just c4):[]) = "["++(show c1)++" "++(show c2)++" "++(show c3)++"]"++" ["++(show c4)++"]"
+hhCards ((Just c1):(Just c2):(Just c3):(Just c4):(Just c5):[]) = "["++(show c1)++" "++(show c2)++" "++(show c3)++(show c4)++"]"++" ["++(show c5)++"]"
+hhCards _ = "[]"

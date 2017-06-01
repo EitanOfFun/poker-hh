@@ -28,5 +28,6 @@ executable poker-hh
                        , lens-aeson
                        , text
                        , vector
+                       , directory
                        , unordered-containers
   default-language:     Haskell2010

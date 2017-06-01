@@ -11,7 +11,7 @@ data HandID = HandID
   { handID :: !String
   , label :: !String
   , table :: !String
-  } deriving (Show)
+  } deriving (Show, Eq)
 
 instance FromJSON HandID where
    parseJSON (Object v) =
@@ -24,3 +24,24 @@ parseHandIDs :: Value -> Parser [HandID]
 parseHandIDs = withObject "HandIDs" $ \o -> do
   o .: "data"
 
+fixLabel :: HandID -> HandID
+fixLabel (HandID h1 h2 h3) = HandID {
+    handID = h1
+  , label = "_" ++ (fmap replaceBadCharWith_ h2)
+  , table = h3
+}
+
+replaceBadCharWith_ ' ' = '_'
+replaceBadCharWith_ '(' = '_'
+replaceBadCharWith_ ')' = '_'
+replaceBadCharWith_ ':' = '_'
+replaceBadCharWith_ c = c
+
+
+hexToDec 'f' = 15
+hexToDec 'e' = 14
+hexToDec 'd' = 13
+hexToDec 'c' = 12
+hexToDec 'b' = 11
+hexToDec 'a' = 10
+hexToDex c = c
