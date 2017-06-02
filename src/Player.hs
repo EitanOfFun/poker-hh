@@ -105,10 +105,11 @@ _seatOfSB (p:ps) i = if isSB p then i else _seatOfSB ps (i + 1)
 hero :: [Player] -> Player
 hero ps = head (L.filter (\p -> playerID p == _HERO_ID) ps)
 
-winner :: [Player] -> Player
-winner ps = head (L.filter (\p -> won p) ps)
+winners :: [Player] -> [Player]
+winners = L.filter (\p -> won p)
 
-
+tie :: [Player] -> Bool
+tie ps = length (L.filter (\p -> won p) ps) == 2
 
 playersChipActionsOfStreet :: Player -> Int -> Maybe [(String, ChipAction)]
 playersChipActionsOfStreet p street

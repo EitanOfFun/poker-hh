@@ -78,8 +78,56 @@ fixCalls (x1: (Call c) : xs) = case x1 of
     (Blind b) -> case (c - b) of
         0 -> x1 : Check : (fixCalls xs)
         d -> x1 : (Call d): (fixCalls xs)
---     (Raise b) -> case (c - b) of   // don't know why I needed this case (doesn't make sense to me now)
+--     (Raise b) -> case (c - b) of   -- don't know why I needed this case (doesn't make sense to me now)
 --         0 -> x1 : Check : (fixCalls xs)
 --         d -> x1 : (Call d): (fixCalls xs)
     _ -> x1 : (Call c): (fixCalls xs)
 fixCalls (x1 : x2) = x1 : fixCalls x2
+
+
+--     Blind Integer
+--   | Allin Integer
+--   | Raise Integer
+--   | Call Integer
+--   | Check
+--   | Fold
+-- 1 single action can be:
+--  check, fold
+-- last action can be:
+-- call, check, fold
+-- 2 actions can be:
+-- post-flop:
+-- raise-call, allin-call, raise-fold, allin-fold,check-check, check-fold, fold-fold (bug - when both players leave table before hand is over)
+-- can't be pre-flop because 2 blinds plus fold is minimum (3) for pre-flop
+-- actions can be:
+-- (sb)blind-fold,
+--
+-- sb -> bb -> raise-> call =>0
+-- sb -> bb ->  =>0
+--
+
+potTotal :: Maybe [(String, ChipAction)] -> Integer
+potTotal Nothing = 0
+potTotal (Just c) = (potTotal_ . (fmap snd)) c
+
+potTotal_ :: [ChipAction] -> Integer
+potTotal_ (Raise r:Call c:_) = r * 2
+potTotal_ (Allin r:Call c:_) = r * 2
+potTotal_ [] = 0
+potTotal_ (x:[]) = 0
+potTotal_ (_:_:[]) = 0
+potTotal_ cs = case reverse cs of
+    (Fold:Fold:Call c:xs) -> c * 2
+    (Fold:Call c:xs) -> c * 2 -- BUG when leaving table after calling
+    (Fold:_:Check:xs) -> 0
+    (Fold:_:Blind b:xs) -> b * 2
+    (Fold:_:(Raise r):xs) -> r * 2
+    (Fold:_:(Allin r):xs) -> r * 2
+    (Check:_:Blind b:xs) -> b * 2
+    (Check:xs) -> 0
+    (Call c:Raise r: Blind b:xs) -> r * 2
+    _ -> 9999999 -- BUG should never reach here
+
+
+
+

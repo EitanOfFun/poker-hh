@@ -8,6 +8,7 @@ import ChipAction
 import HandID
 import Player
 import HandActions
+import Data.Maybe
 import GHC.Generics
 import GHC.Exts as E (fromList)
 import Data.Char (isDigit)
@@ -95,24 +96,31 @@ writeLatest25Hands = do
 readHand = do
     fileName <- fmap (head . (drop 3)) (listDirectory _FILE_PATH)
     r <- fmap C.pack (readFile (_FILE_PATH ++ fileName))
-    return r
---     let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
---         fixed = fmap fixHandActions decoded
---         hh = fmap (handToHH (parseTempFileNameID fileName)(parseTempFileNameDate fileName)) fixed
---     return (showEither hh)
+--     return r
+    let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
+        fixed = fmap fixHandActions decoded
+        hh = fmap (handToHH (parseTempFileNameID fileName)(parseTempFileNameDate fileName)) fixed
+    return ( hh)
 
 
 
 -- handToHH :: HandActions -> String
 handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
     if length ps >= 3
-        then [(show (length ps)) ++ " players - too many players"]
+        then (show (length ps)) ++ " players - too many players"
     else let sb = head $ List.filter isSB ps
              bb = head $ List.filter isBB ps
              seat1 = head ps
              seat2 = last ps
+--              pWinners = winners ps
+             preFlopAction = getMergedStreetActions bb sb 0
+             flopAction = getMergedStreetActions bb sb 1
+             turnAction = getMergedStreetActions bb sb 2
+             riverAction = getMergedStreetActions bb sb 3
+             allAction = [preFlopAction, flopAction, turnAction, riverAction]
+             pTotal = List.foldl (+) 0 (fmap potTotal allAction)
              s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (blind sb) ++ "$/" ++ show (blind bb) ++ "$) - " ++ date
-                 , "Table: " ++ (tableFromBB (blind bb)) ++ "5-max (real money) Seat #" ++ (show (seatOfSB ps))
+                 , "Table: " ++ (tableFromBB (blind bb)) ++ " 5-max (real money) Seat #" ++ (show (seatOfSB ps) ++ " is the button")
                  , "Seat 1: " ++ (screenName seat1) ++ " ($" ++ (show (stack seat1)) ++ ")"
                  , "Seat 2: " ++ (screenName seat2) ++ " ($" ++ (show (stack seat2)) ++ ")"
                  , "*** ANTE/BLINDS ***"
@@ -121,34 +129,81 @@ handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
                  , "*** PRE-FLOP ***"
                  , "Dealt to " ++ (screenName (hero ps)) ++ " " ++ (hhCards (cards (hero ps)))
 --                  , "PRE-FLOP:  " ++ (showMaybe (fmap showStreetActions preFlopAction))
-                 , (showStreetActions bb sb [c1,c2,c3,c4,c5] 0)
-                 , (showStreetActions bb sb [c1,c2,c3,c4,c5] 1)
-                 , (showStreetActions bb sb [c1,c2,c3,c4,c5] 2)
-                 , (showStreetActions bb sb [c1,c2,c3,c4,c5] 3)
+                 , (showStreetActions preFlopAction [] 0)
+                 , (showStreetActions flopAction [c1,c2,c3] 1)
+                 , (showStreetActions turnAction [c1,c2,c3,c4] 2)
+                 , (showStreetActions riverAction [c1,c2,c3,c4,c5] 3)
                  , "*** SUMMARY ***"
-
-                 , "Total pot $" ++ " | Rake $0"
+                 , "Total pot $" ++ (show pTotal) ++ " | Rake $0"
+                 , showBoard [c1,c2,c3,c4,c5]
+                 , showWinners ps pTotal
+--                  , "Seat " ++ (seat ps won) ++ ": " ++ (screenName won)
+--                  , "Total pot $" ++ (show (fmap potTotal allAction)) ++ " | Rake $0"
+--                  , "ACTION: " ++ (showMaybe preFlopAction)
                  ]
-         in s
+         in removeExtraNewLines $ (concat (intersperse "\n" s)) ++ "\n"
 
-showStreetActions bb sb (c1:c2:c3:c4:c5:[]) street =
+removeExtraNewLines :: String -> String
+removeExtraNewLines [] = []
+removeExtraNewLines (x1:[]) = x1:[]
+removeExtraNewLines (x1:x2:xs) =
+    if x1 == "\n" && x2 == "\n"
+        then x2 : removeExtraNewLines xs
+            else x1 : removeExtraNewLines (x2 : xs)
+
+showWinners :: [Player] -> Integer -> String
+showWinners ps pTotal =
+    let won = winners ps
+        f = (\p ->
+            "Seat " ++ (show (seat ps p)) ++ ": "
+             ++ (screenName p) ++ " showed " ++ (hhCards (cards p)) ++
+             " and won " ++ (show (div pTotal (toInteger (length won)))) ++ "$")
+    in concat ( intersperse "\n" (fmap f won))
+
+
+showBoard :: [Maybe Card] -> String
+showBoard cards =
+    if length (catMaybes cards) == 0
+    then ""
+    else "Board: " ++ (showListOfMaybes cards)
+
+seat :: [Player] -> Player -> Int
+seat (x:xs:[]) p = if p == x then 1 else 2
+
+getMergedStreetActions :: Player -> Player -> Int -> Maybe [(String, ChipAction)]
+getMergedStreetActions bb sb street =
     let sbActions = playersChipActionsOfStreet sb street
         bbActions = playersChipActionsOfStreet bb street
-    in
-        if street == 0
-            then showMaybe $ fmap showStreetChipActions (fmap (drop 2) (mergeMaybeList sbActions bbActions))
-            else
-            let merged = mergeMaybeList bbActions sbActions
-            in case merged of
-                    Just m -> case street of
-                                        1 -> "*** FLOP *** " ++ (hhCards (c1:c2:c3:[])) ++ "\n" ++ (showStreetChipActions m)
-                                        2 -> "*** TURN *** " ++ (hhCards (c1:c2:c3:c4:[])) ++ "\n" ++ (showStreetChipActions m)
-                                        3 -> "*** RIVER *** " ++ (hhCards (c1:c2:c3:c4:c5:[])) ++ "\n" ++ (showStreetChipActions m)
-                                        _ -> ""
-                    _ -> ""
+    in if street == 0
+            then mergeMaybeList sbActions bbActions
+            else mergeMaybeList bbActions sbActions
+
+showStreetActions Nothing _ _ = ""
+showStreetActions (Just m) _ 0 = showStreetChipActions (drop 2 m)
+showStreetActions (Just m) cards 1 = "*** FLOP *** " ++ (hhCards cards) ++ "\n" ++ (showStreetChipActions m)
+showStreetActions (Just m) cards 2 = "*** TURN *** " ++ (hhCards cards) ++ "\n" ++ (showStreetChipActions m)
+showStreetActions (Just m) cards 3 = "*** RIVER *** " ++ (hhCards cards) ++ "\n" ++ (showStreetChipActions m)
+showStreetActions _ _ _ = ""
+
+--     let mergeed = playersChipActionsOfStreet sb street
+--         bbActions = playersChipActionsOfStreet bb street
+--     in
+--         if street == 0
+--             then showMaybe $ fmap showStreetChipActions (fmap (drop 2) (mergeMaybeList sbActions bbActions))
+--             else
+--             let merged = mergeMaybeList bbActions sbActions
+--             in case merged of
+--                     Just m -> case street of
+-- --                                         1 -> "*** FLOP *** " ++ (hhCards (c1:c2:c3:[])) ++ "\n" ++ (showStreetChipActions m)
+-- --                                         2 -> "*** TURN *** " ++ (hhCards (c1:c2:c3:c4:[])) ++ "\n" ++ (showStreetChipActions m)
+-- --                                         3 -> "*** RIVER *** " ++ (hhCards (c1:c2:c3:c4:c5:[])) ++ "\n" ++ (showStreetChipActions m)
+-- --                                         _ -> ""
+--                     _ -> ""
 
 
 
+showListOfMaybes :: Show a => [Maybe a] -> String
+showListOfMaybes mbs = "[" ++ (concat (intersperse " " ((fmap show) (catMaybes mbs)))) ++ "]"
 showMaybe :: Show a => Maybe a -> String
 showMaybe Nothing = ""
 showMaybe (Just a) = show a
@@ -186,10 +241,9 @@ merge (x:xs) (y:ys) = x : y : merge xs ys
 
 -- writeHandActionsUnparsedJSON ::
 main :: IO ()
-main = undefined
--- main = do
---     h <- readHand
---     case h of
---         (Right hand) -> do
---             putStr hand
---         (Left e) -> do putStr "dfg"
+main = do
+    h <- readHand
+    case h of
+        (Right hand) -> do
+            putStr hand
+        (Left e) -> do putStr "dfg"
