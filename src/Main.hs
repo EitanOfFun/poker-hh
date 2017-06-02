@@ -36,12 +36,10 @@ import Control.Monad
 
 
 -- TODO update automaticaly to new url
-_NEW_ACCESS_TOKEN_AFTER = "var apiUrl = \"app/index.php?accessToken=\" + \""
+-- _PARSE_NEW_ACCESS_TOKEN_AFTER = "var apiUrl = \"app/index.php?accessToken=\" + \""
 _BASE_URL = "https://www.turngs.com/games/poker/plugins/log/app/index.php?accessToken="
 _ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiI3OS4xODAuMjkuNCIsImZ1bGxBY2Nlc3MiOnRydWUsImV4cCI6MTQ5NjMyNjU4N30.jsvkjSbMQiOyS2qBYbf9Xu1WaQUogWc10fk_rD5fhyw"
 _URL_ID_LIST = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=list"
-_SAMPLE_ID = "592d5d67661c65f81004cff5"
-_sdf =   "https://www.turngs.com/games/poker/plugins/log/index.php?accessToken=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiI3OS4xODAuMjkuNCIsImZ1bGxBY2Nlc3MiOnRydWUsImV4cCI6MTQ5NjI2MzQ4NX0.UDf-qk89osAFRmslo3iYEKusyYUQvNkqtE8vV80m-GI#"
 _URL_HAND_ACTIONS = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=detay&id="
 _FILE_PATH = "database/hh-json/"
 
@@ -94,7 +92,7 @@ writeLatest25Hands = do
 -- readHand :: IO (Either String HandActions)
 -- readHand :: IO (Either String [String])
 readHand = do
-    fileName <- fmap (head . (drop 3)) (listDirectory _FILE_PATH)
+    fileName <- fmap (head . (drop 5)) (listDirectory _FILE_PATH)
     r <- fmap C.pack (readFile (_FILE_PATH ++ fileName))
 --     return r
     let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
@@ -119,13 +117,13 @@ handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
              riverAction = getMergedStreetActions bb sb 3
              allAction = [preFlopAction, flopAction, turnAction, riverAction]
              pTotal = List.foldl (+) 0 (fmap potTotal allAction)
-             s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (blind sb) ++ "$/" ++ show (blind bb) ++ "$) - " ++ date
+             s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (blind sb) ++ "€/" ++ show (blind bb) ++ "€) - " ++ date
                  , "Table: " ++ (tableFromBB (blind bb)) ++ " 5-max (real money) Seat #" ++ (show (seatOfSB ps) ++ " is the button")
-                 , "Seat 1: " ++ (screenName seat1) ++ " ($" ++ (show (stack seat1)) ++ ")"
-                 , "Seat 2: " ++ (screenName seat2) ++ " ($" ++ (show (stack seat2)) ++ ")"
+                 , "Seat 1: " ++ (screenName seat1) ++ " (" ++ (show (stack seat1)) ++ "€)"
+                 , "Seat 2: " ++ (screenName seat2) ++ " (" ++ (show (stack seat2)) ++ "€)"
                  , "*** ANTE/BLINDS ***"
-                 , (screenName sb) ++ " posts small blind $" ++ (show (blind sb))
-                 , (screenName bb) ++ " posts big blind $" ++ (show (blind bb))
+                 , (screenName sb) ++ " posts small blind " ++ (show (blind sb) ++ "€")
+                 , (screenName bb) ++ " posts big blind " ++ (show (blind bb) ++ "€")
                  , "*** PRE-FLOP ***"
                  , "Dealt to " ++ (screenName (hero ps)) ++ " " ++ (hhCards (cards (hero ps)))
 --                  , "PRE-FLOP:  " ++ (showMaybe (fmap showStreetActions preFlopAction))
@@ -133,23 +131,26 @@ handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
                  , (showStreetActions flopAction [c1,c2,c3] 1)
                  , (showStreetActions turnAction [c1,c2,c3,c4] 2)
                  , (showStreetActions riverAction [c1,c2,c3,c4,c5] 3)
+                 , if reachedShowDown [c1,c2,c3,c4,c5] then "" else (screenName (head (winners ps))) ++ " collected " ++ (show pTotal) ++ "€ from pot"
                  , "*** SUMMARY ***"
-                 , "Total pot $" ++ (show pTotal) ++ " | Rake $0"
+                 , "Total pot " ++ (show pTotal) ++ "€ | Rake 0€"
                  , showBoard [c1,c2,c3,c4,c5]
                  , showWinners ps pTotal
 --                  , "Seat " ++ (seat ps won) ++ ": " ++ (screenName won)
---                  , "Total pot $" ++ (show (fmap potTotal allAction)) ++ " | Rake $0"
+--                  , "Total pot €" ++ (show (fmap potTotal allAction)) ++ " | Rake €0"
 --                  , "ACTION: " ++ (showMaybe preFlopAction)
                  ]
-         in removeExtraNewLines $ (concat (intersperse "\n" s)) ++ "\n"
+         in removeExtraNewLines $ (concat (intersperse "\n" (List.filter (/= "") s))) ++ "\n"
+
+reachedShowDown :: [Maybe Card] -> Bool
+reachedShowDown cs = length (catMaybes cs) == 5
 
 removeExtraNewLines :: String -> String
-removeExtraNewLines [] = []
+removeExtraNewLines (x1:x2:xs) = if x1 == '\n' && x2 == '\n'
+    then x2 : removeExtraNewLines xs
+    else x1 : removeExtraNewLines (x2 : xs)
 removeExtraNewLines (x1:[]) = x1:[]
-removeExtraNewLines (x1:x2:xs) =
-    if x1 == "\n" && x2 == "\n"
-        then x2 : removeExtraNewLines xs
-            else x1 : removeExtraNewLines (x2 : xs)
+removeExtraNewLines [] = []
 
 showWinners :: [Player] -> Integer -> String
 showWinners ps pTotal =
@@ -157,7 +158,7 @@ showWinners ps pTotal =
         f = (\p ->
             "Seat " ++ (show (seat ps p)) ++ ": "
              ++ (screenName p) ++ " showed " ++ (hhCards (cards p)) ++
-             " and won " ++ (show (div pTotal (toInteger (length won)))) ++ "$")
+             " and won " ++ (show (div pTotal (toInteger (length won)))) ++ "€")
     in concat ( intersperse "\n" (fmap f won))
 
 
@@ -237,7 +238,9 @@ merge (x:xs) (y:ys) = x : y : merge xs ys
 --         (Just c) -> do (sequence $  fmap writeHandActionsUnparsedJSON c)
 --         Nothing -> return [()]
 
-
+doit file str = do
+    contents <- readFile file
+    length contents `seq` (writeFile file $ (str ++ "\n\n\n\n\n\n\n\n\n" ++ contents))
 
 -- writeHandActionsUnparsedJSON ::
 main :: IO ()
@@ -246,4 +249,4 @@ main = do
     case h of
         (Right hand) -> do
             putStr hand
-        (Left e) -> do putStr "dfg"
+        (Left e) -> do putStr e

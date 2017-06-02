@@ -8,7 +8,7 @@ import Control.Applicative
 import Control.Monad
 
 _YEAR = "2017"
-_MONTH = "06"
+_MONTH = "05"
 
 data HandID = HandID
   { handID :: !String

@@ -25,13 +25,13 @@ showStreetChipActions xs = foldl (\str tuple -> str ++ (showChipActionWithScreen
 showChipActionWithScreenName :: (String, ChipAction) -> String
 showChipActionWithScreenName (s, action) = s ++ " " ++ (showChipAction action)
 
-showChipAction (Blind 50) = "posts the small blind of $50"
-showChipAction (Blind 100) = "posts the big blind of $100"
-showChipAction (Blind 200) = "posts the small blind of $20"
-showChipAction (Blind 40) = "posts the big blind of $40"
-showChipAction (Allin n) = "raises to $" ++ (show n)
-showChipAction (Raise n) = "raises to $" ++ (show n)
-showChipAction (Call n) = "calls $" ++ (show n)
+showChipAction (Blind 50) = "posts the small blind of 50€"
+showChipAction (Blind 100) = "posts the big blind of 100€"
+showChipAction (Blind 200) = "posts the small blind of 20€"
+showChipAction (Blind 40) = "posts the big blind of 40€"
+showChipAction (Allin n) = "raises to " ++ (show n) ++ "€"
+showChipAction (Raise n) = "raises to " ++ (show n) ++ "€"
+showChipAction (Call n) = "calls " ++ (show n) ++ "€"
 showChipAction Check = "checks"
 showChipAction Fold = "folds"
 showChipAction (Blind b) = "ERROR: Blind " ++ (show b) ++ " not supported"
@@ -115,10 +115,22 @@ potTotal_ (Raise r:Call c:_) = r * 2
 potTotal_ (Allin r:Call c:_) = r * 2
 potTotal_ [] = 0
 potTotal_ (x:[]) = 0
+potTotal_ (Raise r:Fold:[]) = r
+potTotal_ (Allin r:Fold:[]) = r
 potTotal_ (_:_:[]) = 0
 potTotal_ cs = case reverse cs of
     (Fold:Fold:Call c:xs) -> c * 2
     (Fold:Call c:xs) -> c * 2 -- BUG when leaving table after calling
+
+    (Fold:Raise r:Check:xs) -> r
+    (Fold:Allin r:Check:xs) -> r
+    (Fold:Raise r2:Raise r1:xs) -> r1 + r2
+    (Fold:Allin r2:Raise r1:xs) -> r1 + r2
+
+    (Fold:Blind bb:Blind sb:xs) -> sb + bb
+    (Fold:Raise r:Blind bb:xs) -> r + bb
+    (Fold:Allin r:Blind bb:xs) -> r + bb
+
     (Fold:_:Check:xs) -> 0
     (Fold:_:Blind b:xs) -> b * 2
     (Fold:_:(Raise r):xs) -> r * 2
@@ -126,6 +138,7 @@ potTotal_ cs = case reverse cs of
     (Check:_:Blind b:xs) -> b * 2
     (Check:xs) -> 0
     (Call c:Raise r: Blind b:xs) -> r * 2
+    (Call c:Allin r: Blind b:xs) -> r * 2
     _ -> 9999999 -- BUG should never reach here
 
 
