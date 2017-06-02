@@ -8,6 +8,7 @@ import ChipAction
 import HandID
 import Player
 import HandActions
+import TurnDate
 import Data.Maybe
 import GHC.Generics
 import GHC.Exts as E (fromList)
@@ -18,9 +19,6 @@ import qualified Data.ByteString.Lazy as BSL     ( toChunks , pack, unpack)
 import qualified Data.ByteString.Lazy.Char8 as C ( fromChunks, pack, writeFile, readFile)
 import qualified Data.HashMap.Lazy as HML        ( lookup )
 import qualified Data.HashMap.Strict as HM
--- import qualified Data.Text.Lazy.IO as T
--- import qualified Data.Text.Lazy.Encoding as T
--- import qualified Data.Text.Lazy as T (unpack)
 import Network.Wreq
 import Control.Lens
 import Prelude hiding (putStrLn)
@@ -41,7 +39,9 @@ _BASE_URL = "https://www.turngs.com/games/poker/plugins/log/app/index.php?access
 _ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiI3OS4xODAuMjkuNCIsImZ1bGxBY2Nlc3MiOnRydWUsImV4cCI6MTQ5NjMyNjU4N30.jsvkjSbMQiOyS2qBYbf9Xu1WaQUogWc10fk_rD5fhyw"
 _URL_ID_LIST = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=list"
 _URL_HAND_ACTIONS = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=detay&id="
-_FILE_PATH = "database/hh-json/"
+_FILE_PATH_JSON = "database/hh-json/"
+_FILE_PATH_CORRECTLY = "database/processed-correctly/"
+_FILE_PATH_ERRORS = "database/processed-errors/"
 
 
 
@@ -65,15 +65,21 @@ reqHandActions hID = do
         fixed = fmap fixHandActions decoded
     return (fixed)
 
--- decodeHandActions :: String -> (Either String HandActions)
--- decodeHandActions s = do
---     let decoded = eitherDecode s :: Either String HandActionsResp
---         fixed = fmap fixHandActions decoded
---     return (fixed)
+{--
+-- TODO: WIP!!
+
+readJSONFileConvertWrite = do
+   fileNs <- fmap (drop 1) (listDirectory _FILE_PATH_JSON) -- get IO list of json file from directory
+   let idAndDates = fmap (\f -> (parseTempFileNameID f, parseTempFileNameDate f)) fileNs -- (id, simpledate)
+   return (take 3 idAndDates)
+
+--}
+
+
 
 writeHandActionsUnparsedJSON :: HandID -> IO ()
 writeHandActionsUnparsedJSON hID =
-    let file = _FILE_PATH ++ (HandID.handID hID) ++(HandID.label (fixHandID hID)) ++  ".txt"
+    let file = _FILE_PATH_JSON ++ (HandID.handID hID) ++(HandID.label (fixHandID hID)) ++  ".txt"
     in do
         n <- doesFileExist (file)
         case n of
@@ -91,19 +97,20 @@ writeLatest25Hands = do
 
 -- readHand :: IO (Either String HandActions)
 -- readHand :: IO (Either String [String])
-readHand = do
-    fileName <- fmap (head . (drop 5)) (listDirectory _FILE_PATH)
-    r <- fmap C.pack (readFile (_FILE_PATH ++ fileName))
+
+readHand = do --              drop 1 to drop .DS_Store
+    fileName <- fmap (head . (drop 1)) (listDirectory _FILE_PATH_JSON)
+    r <- fmap C.pack (readFile (_FILE_PATH_JSON ++ fileName))
 --     return r
     let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
         fixed = fmap fixHandActions decoded
-        hh = fmap (handToHH (parseTempFileNameID fileName)(parseTempFileNameDate fileName)) fixed
+        hh = fmap (handToHH (parseTempFileNameID fileName,parseTempFileNameDate fileName)) fixed
     return ( hh)
 
 
 
 -- handToHH :: HandActions -> String
-handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
+handToHH  (hId, date) (HandActions ps c1 c2 c3 c4 c5) = do
     if length ps >= 3
         then (show (length ps)) ++ " players - too many players"
     else let sb = head $ List.filter isSB ps
@@ -117,7 +124,7 @@ handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
              riverAction = getMergedStreetActions bb sb 3
              allAction = [preFlopAction, flopAction, turnAction, riverAction]
              pTotal = List.foldl (+) 0 (fmap potTotal allAction)
-             s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (blind sb) ++ "€/" ++ show (blind bb) ++ "€) - " ++ date
+             s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (blind sb) ++ "€/" ++ show (blind bb) ++ "€) - " ++ (showDateInsideHH date)
                  , "Table: " ++ (tableFromBB (blind bb)) ++ " 5-max (real money) Seat #" ++ (show (seatOfSB ps) ++ " is the button")
                  , "Seat 1: " ++ (screenName seat1) ++ " (" ++ (show (stack seat1)) ++ "€)"
                  , "Seat 2: " ++ (screenName seat2) ++ " (" ++ (show (stack seat2)) ++ "€)"
@@ -136,9 +143,6 @@ handToHH  hId date (HandActions ps c1 c2 c3 c4 c5) = do
                  , "Total pot " ++ (show pTotal) ++ "€ | Rake 0€"
                  , showBoard [c1,c2,c3,c4,c5]
                  , showWinners ps pTotal
---                  , "Seat " ++ (seat ps won) ++ ": " ++ (screenName won)
---                  , "Total pot €" ++ (show (fmap potTotal allAction)) ++ " | Rake €0"
---                  , "ACTION: " ++ (showMaybe preFlopAction)
                  ]
          in removeExtraNewLines $ (concat (intersperse "\n" (List.filter (/= "") s))) ++ "\n"
 
@@ -186,22 +190,6 @@ showStreetActions (Just m) cards 2 = "*** TURN *** " ++ (hhCards cards) ++ "\n" 
 showStreetActions (Just m) cards 3 = "*** RIVER *** " ++ (hhCards cards) ++ "\n" ++ (showStreetChipActions m)
 showStreetActions _ _ _ = ""
 
---     let mergeed = playersChipActionsOfStreet sb street
---         bbActions = playersChipActionsOfStreet bb street
---     in
---         if street == 0
---             then showMaybe $ fmap showStreetChipActions (fmap (drop 2) (mergeMaybeList sbActions bbActions))
---             else
---             let merged = mergeMaybeList bbActions sbActions
---             in case merged of
---                     Just m -> case street of
--- --                                         1 -> "*** FLOP *** " ++ (hhCards (c1:c2:c3:[])) ++ "\n" ++ (showStreetChipActions m)
--- --                                         2 -> "*** TURN *** " ++ (hhCards (c1:c2:c3:c4:[])) ++ "\n" ++ (showStreetChipActions m)
--- --                                         3 -> "*** RIVER *** " ++ (hhCards (c1:c2:c3:c4:c5:[])) ++ "\n" ++ (showStreetChipActions m)
--- --                                         _ -> ""
---                     _ -> ""
-
-
 
 showListOfMaybes :: Show a => [Maybe a] -> String
 showListOfMaybes mbs = "[" ++ (concat (intersperse " " ((fmap show) (catMaybes mbs)))) ++ "]"
@@ -223,26 +211,10 @@ merge xs     []     = xs
 merge []     ys     = ys
 merge (x:xs) (y:ys) = x : y : merge xs ys
 
---     return(decodeHandActions r)
---     return decoded
-
-
---     case r of
---         (Just handIDs) -> do
---             t <- fmap writeHandActionsUnparsedJSON (fmap HandID.handID handIDs)
---             return t
---     return r
-
---     l <- reqLatest25HandIDs
---     case (fmap . fmap) HandID.handID l of
---         (Just c) -> do (sequence $  fmap writeHandActionsUnparsedJSON c)
---         Nothing -> return [()]
-
-doit file str = do
+prependToFile file str = do
     contents <- readFile file
-    length contents `seq` (writeFile file $ (str ++ "\n\n\n\n\n\n\n\n\n" ++ contents))
+    length contents `seq` (writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
 
--- writeHandActionsUnparsedJSON ::
 main :: IO ()
 main = do
     h <- readHand

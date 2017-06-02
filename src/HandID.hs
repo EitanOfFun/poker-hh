@@ -7,8 +7,6 @@ import Data.Aeson.Types as Ty
 import Control.Applicative
 import Control.Monad
 
-_YEAR = "2017"
-_MONTH = "05"
 
 data HandID = HandID
   { handID :: !String
@@ -43,24 +41,7 @@ replaceBadCharWith_ c = c
 parseTempFileNameID :: String -> String
 parseTempFileNameID = takeWhile ((/=) '_')
 
-parseTempFileNameDate :: String -> String
-parseTempFileNameDate fileName =
-    let hID = parseTempFileNameID fileName
-        t = drop 1 (dropWhile ((/=) '_') fileName)
-        day = take 2 t
-        hour = take 2 (drop 4 t)
-        min = take 2 (drop 7 t)
-        sec = hexToDec (last hID)
-    in _YEAR ++ "/" ++ _MONTH ++ "/" ++ day ++ " " ++ hour ++ ":" ++ min ++ ":" ++ sec ++ " UTC"
 
-hexToDec 'f' = "15"
-hexToDec 'e' = "14"
-hexToDec 'd' = "13"
-hexToDec 'c' = "12"
-hexToDec 'b' = "11"
-hexToDec 'a' = "10"
-hexToDec c = '0':c:[]
--- date :: HandID
 
 tableFromBB :: Integer -> String
 tableFromBB 100 = "'BigDog-Advanced1'"
