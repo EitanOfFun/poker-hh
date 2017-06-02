@@ -38,7 +38,7 @@ replaceBadCharWith_ ')' = '_'
 replaceBadCharWith_ ':' = '_'
 replaceBadCharWith_ c = c
 
-parseTempFileNameID :: String -> String
+parseTempFileNameID :: FilePath -> String
 parseTempFileNameID = takeWhile ((/=) '_')
 
 

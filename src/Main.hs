@@ -2,6 +2,7 @@
 
 module Main where
 
+import System.IO
 import System.Directory
 import Card
 import ChipAction
@@ -65,15 +66,18 @@ reqHandActions hID = do
         fixed = fmap fixHandActions decoded
     return (fixed)
 
-{--
--- TODO: WIP!!
+-- [(id, Date, fileName)]
 
 readJSONFileConvertWrite = do
-   fileNs <- fmap (drop 1) (listDirectory _FILE_PATH_JSON) -- get IO list of json file from directory
-   let idAndDates = fmap (\f -> (parseTempFileNameID f, parseTempFileNameDate f)) fileNs -- (id, simpledate)
-   return (take 3 idAndDates)
+   fileNs <- fmap (take 1 . drop 1) (listDirectory _FILE_PATH_JSON) -- get IO list of json file from directory
+   let idDateFileName = fmap (\f -> (parseTempFileNameID f, parseTempFileNameDate f, f)) fileNs -- (id, simpledate)
+   mapM_ readHand idDateFileName
 
---}
+
+--
+-- readFileUnsafe :: FilePath -> String
+-- readFileUnsafe file = do
+--     f <- readFile (_FILE_PATH_JSON ++ file
 
 
 
@@ -98,15 +102,26 @@ writeLatest25Hands = do
 -- readHand :: IO (Either String HandActions)
 -- readHand :: IO (Either String [String])
 
-readHand = do --              drop 1 to drop .DS_Store
-    fileName <- fmap (head . (drop 1)) (listDirectory _FILE_PATH_JSON)
+readHand (iD, date, fileName) = do --              drop 1 to drop .DS_Store
+--     fileName <- fmap (head . (drop 1)) (listDirectory _FILE_PATH_JSON)
     r <- fmap C.pack (readFile (_FILE_PATH_JSON ++ fileName))
---     return r
     let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
         fixed = fmap fixHandActions decoded
-        hh = fmap (handToHH (parseTempFileNameID fileName,parseTempFileNameDate fileName)) fixed
-    return ( hh)
+        hh = fmap (handToHH (iD, date)) fixed
+    putStr (showEither hh)
+--         newFile = _FILE_PATH_CORRECTLY ++ iD ++ (show date) ++ ".txt"
+--     do
+--         n <- doesFileExist newFile
+--         case n of
+--             True -> prependToFile newFile (showEither hh)
+--             False -> writeWithoutEsc newFile (showEither hh)
+--     return ( hh)
 
+writeWithoutEsc :: String -> String -> IO ()
+writeWithoutEsc fileName contents = do
+    handle <- openFile fileName WriteMode
+    hPutStr handle contents
+    hClose handle
 
 
 -- handToHH :: HandActions -> String
@@ -211,14 +226,24 @@ merge xs     []     = xs
 merge []     ys     = ys
 merge (x:xs) (y:ys) = x : y : merge xs ys
 
+
 prependToFile file str = do
     contents <- readFile file
-    length contents `seq` (writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
+    let l = length contents
+    do
+        handle <- openFile file WriteMode
+        hPutStr handle (str ++ "\n\n\n\n\n\n\n\n" ++ contents)
+        hClose handle
+--     length contents `seq` (I.writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
+-- prependToFile file str = do
+--     contents <- readFile file
+--     length contents `seq` (I.writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
 
 main :: IO ()
-main = do
-    h <- readHand
-    case h of
-        (Right hand) -> do
-            putStr hand
-        (Left e) -> do putStr e
+main = undefined
+-- main = do
+--     h <- readHand
+--     case h of
+--         (Right hand) -> do
+--             putStr hand
+--         (Left e) -> do putStr e

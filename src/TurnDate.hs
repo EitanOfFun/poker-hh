@@ -15,6 +15,8 @@ data TurnDate = TurnDate
     , min :: !String
     , sec :: !String
     }
+instance Show TurnDate where
+    show = showDateOutsideHH
 
 showDateInsideHH :: TurnDate -> String
 showDateInsideHH (TurnDate y mo d h mi s) = y ++ "/" ++ mo ++ "/" ++ d ++ " " ++ h ++ ":" ++ mi ++ ":" ++ s ++ " UTC"
@@ -22,7 +24,7 @@ showDateInsideHH (TurnDate y mo d h mi s) = y ++ "/" ++ mo ++ "/" ++ d ++ " " ++
 showDateOutsideHH :: TurnDate -> String
 showDateOutsideHH (TurnDate y mo d h mi s) = "-" ++ mo ++ "-" ++ d ++ "-" ++ y
 
-parseTempFileNameDate :: String -> TurnDate
+parseTempFileNameDate :: FilePath -> TurnDate
 parseTempFileNameDate fileName =
     let hID = parseTempFileNameID fileName
         t = drop 1 (dropWhile ((/=) '_') fileName)
