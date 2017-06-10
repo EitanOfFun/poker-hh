@@ -5,7 +5,7 @@ import HandID
 
 -- TODO:  update these when finished processing and figure out how to automate it
 _YEAR = "2017"
-_MONTH = "05"
+_MONTH = "06"
 
 data TurnDate = TurnDate
     { year :: !String

@@ -3,7 +3,7 @@
 module Player where
 
 import Card
-import ChipAction
+import ChipAction as C
 import Data.Aeson
 import Data.Aeson.Types as Ty
 import Control.Applicative
@@ -75,6 +75,56 @@ f m = case Map.lookup "0" m of
                     Nothing -> [l0, l1, l2]
                     Just l3 -> [l0, l1, l2, l3]
 
+--getBlinds :: (p1, p2) -> (sb, bb)
+getBlinds :: (Player, Player) -> (Player, Player)
+getBlinds (p1,p2)
+    | isSB p1 = (p1, p2)
+    | isSB p2 = (p2, p1)
+    | otherwise =
+        let p1preflop = head (chipActions p1)
+            p2preflop = head (chipActions p2)
+            p1postflop = tail (chipActions p1)
+            p2postflop = tail (chipActions p2)
+        in
+            case compare (length p1preflop) (length p2preflop) of
+            GT -> (p1, p2)
+            LT -> (p2, p1)
+            _ -> case compare (fmap length p1postflop) (fmap length p2postflop) of
+                 GT -> (p2, p1)
+                 LT -> (p1, p2)
+                 _ -> if isActionRaise (last p1preflop)
+                         then (p1, p2)
+                         else if isActionRaise (last p2preflop)
+                                 then (p2, p1)
+                                 else if any isActionRaise (lastActions p1postflop)
+                                         then (p2, p1)
+                                         else if any isActionRaise (lastActions p2postflop)
+                                                then (p1, p2)
+                                                else (notHero [p1,p2], hero [p1,p2])
+                    -- impossible to know who was sb so just pick other player as sb because I will raise 100% of posted sb's
+
+
+
+playerNames :: (Player, Player) -> (String, String)
+playerNames (p1, p2) = (name p1, name p2)
+
+isActionCall (Call _) = True
+isActionCall _ = False
+
+isActionRaise (Raise _) = True
+isActionRaise (Allin _) = True
+isActionRaise _ = False
+
+lastActions :: [[ChipAction]] -> [ChipAction]
+lastActions cas = concat (fmap (\ca -> take 1 (reverse ca)) cas)
+
+lastActionsOnEveryStreetPostFlop :: Player -> [ChipAction]
+lastActionsOnEveryStreetPostFlop ps =
+    let cas = tail (chipActions ps) -- remove pre-flop since order is reversed
+        lastActionList = fmap (\ca -> take 1 (reverse ca)) cas
+    in concat lastActionList
+
+
 blind :: Player -> Integer
 blind p = case head (head (chipActions p)) of
     (Blind i) -> i
@@ -95,15 +145,14 @@ isBB p = case head (head (chipActions p)) of
 screenName :: Player -> String
 screenName p = (name p) ++ "_" ++ (playerID p)
 
-seatOfSB :: [Player] -> Int
-seatOfSB ps = _seatOfSB ps 1
-
-_seatOfSB :: [Player] -> Int -> Int
-_seatOfSB [] _ = 0
-_seatOfSB (p:ps) i = if isSB p then i else _seatOfSB ps (i + 1)
+seat :: [Player] -> Player -> Int
+seat (x:xs:[]) p = if p == x then 1 else 2
 
 hero :: [Player] -> Player
 hero ps = head (L.filter (\p -> playerID p == _HERO_ID) ps)
+
+notHero :: [Player] -> Player
+notHero ps = head (L.filter (\p -> playerID p /= _HERO_ID) ps)
 
 winners :: [Player] -> [Player]
 winners = L.filter (\p -> won p)

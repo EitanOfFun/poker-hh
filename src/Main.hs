@@ -35,17 +35,22 @@ import Control.Monad
 
 
 -- TODO update automaticaly to new url
+
+
 -- _PARSE_NEW_ACCESS_TOKEN_AFTER = "var apiUrl = \"app/index.php?accessToken=\" + \""
 _BASE_URL = "https://www.turngs.com/games/poker/plugins/log/app/index.php?accessToken="
-_ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiI3OS4xODAuMjkuNCIsImZ1bGxBY2Nlc3MiOnRydWUsImV4cCI6MTQ5NjMyNjU4N30.jsvkjSbMQiOyS2qBYbf9Xu1WaQUogWc10fk_rD5fhyw"
+_ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiIxMDkuNjcuMTQ5LjE5NiIsImZ1bGxBY2Nlc3MiOnRydWUsImV4cCI6MTQ5NzExMDIwM30.S8N1uGmpXDWnvUUFMS8DWBw-qSlyxCJ_f5kQvFb50EM"
 _URL_ID_LIST = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=list"
 _URL_HAND_ACTIONS = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=detay&id="
 _FILE_PATH_JSON = "database/hh-json/"
-_FILE_PATH_CORRECTLY = "database/processed-correctly/"
+_FILE_PATH_CORRECTLY = _FILE_PATH_CORRECTLY_PROD
+_FILE_PATH_CORRECTLY_PROD = "database/processed-correctly/" ++ _MONTH ++ "/"
+_FILE_PATH_CORRECTLY_TEST = "database/hh-json/test/" ++ _TEST ++ "/"
 _FILE_PATH_ERRORS = "database/processed-errors/"
 
 
 
+_TEST = "test"
 
 testHandIDData = C.pack "[{\"id\":\"592b343035a9080c68e768f6\",\"label\":\"28 (23:33)\",\"table\":\"Learning - Advanced 3 \"},{\"id\":\"592b33ee56a9083326fc42fa\",\"label\":\"28 (23:32)\",\"table\":\"Learning - Advanced 3 \"}]"
 
@@ -54,22 +59,42 @@ testHandActions = C.pack "{\"players\":[{\"id\":\"1728183\",\"name\":\"Eitan\",\
 chipAction = C.pack "{\"type\": \"BLIND\",\"chip\": \"50 K\"}"
 
 
+reqLatest25HandIDsDebug = do
+   r <- get _URL_ID_LIST
+   return (parseEither parseHandIDs =<< eitherDecode (r ^. responseBody))
+
+
+
 reqLatest25HandIDs :: IO (Maybe [HandID])
 reqLatest25HandIDs = do
    r <- get _URL_ID_LIST
    return (parseMaybe parseHandIDs =<< decode (r ^. responseBody))
 
-reqHandActions :: String -> IO (Either String HandActions)
+-- reqHandActions :: String -> IO (Either String HandActions)
 reqHandActions hID = do
     r <- get (_URL_HAND_ACTIONS ++ hID)
     let decoded = (eitherDecode (r ^. responseBody) :: Either String HandActionsResp)
         fixed = fmap fixHandActions decoded
-    return (fixed)
+    return (decoded)
 
 -- [(id, Date, fileName)]
 
+
+reqHandActionsDebug hID = do
+    r <- get (_URL_HAND_ACTIONS ++ hID)
+    let decoded = (eitherDecode (r ^. responseBody) :: Either String HandActionsResp)
+--         fixed = fmap fixHandActions decoded
+    case decoded of
+        (Left s) -> return ("dsfs " ++ s)
+        (Right s) -> return "d"
+
+
+readDebugHandJSONFileConvertWrite fileName = do
+   let idDateFileName = (\f -> (parseTempFileNameID f, parseTempFileNameDate f, f)) fileName -- (id, simpledate)
+   readHand idDateFileName
+
 readJSONFileConvertWrite = do
-   fileNs <- fmap (take 1 . drop 1) (listDirectory _FILE_PATH_JSON) -- get IO list of json file from directory
+   fileNs <- fmap (drop 1 . tail) (listDirectory (_FILE_PATH_JSON ++ _MONTH ++ "/" )) -- get IO list of json file from directory
    let idDateFileName = fmap (\f -> (parseTempFileNameID f, parseTempFileNameDate f, f)) fileNs -- (id, simpledate)
    mapM_ readHand idDateFileName
 
@@ -92,30 +117,52 @@ writeHandActionsUnparsedJSON hID =
                 r <- get (_URL_HAND_ACTIONS ++ (HandID.handID hID))
                 C.writeFile (file) (r ^. responseBody)
 
-
+-- writeHandActions :: HandID -> IO ()
+-- writeHandActions hID =
+--     let file = _FILE_PATH_JSON ++ (HandID.handID hID) ++(HandID.label (fixHandID hID)) ++  ".txt"
+--     in do
+--         n <- doesFileExist (file)
+--         case n of
+--             True -> return ()
+--             False -> do
+--                 r <- get (_URL_HAND_ACTIONS ++ (HandID.handID hID))
+--                 C.writeFile (file) (r ^. responseBody)
 
 writeLatest25Hands = do
     r <-  reqLatest25HandIDs
     case r of
         (Just hIDs) -> (mapM_ writeHandActionsUnparsedJSON hIDs)
+        _ -> return ()
 
 -- readHand :: IO (Either String HandActions)
 -- readHand :: IO (Either String [String])
 
-readHand (iD, date, fileName) = do --              drop 1 to drop .DS_Store
---     fileName <- fmap (head . (drop 1)) (listDirectory _FILE_PATH_JSON)
-    r <- fmap C.pack (readFile (_FILE_PATH_JSON ++ fileName))
-    let decoded = (eitherDecode (r ) :: Either String HandActionsResp)
+readHand (iD, date, fileName) = do
+    r <- fmap C.pack (readFile (_FILE_PATH_JSON ++ _MONTH ++ "/" ++ fileName))
+    let decoded = (decode (r ) :: Maybe HandActionsResp)
         fixed = fmap fixHandActions decoded
-        hh = fmap (handToHH (iD, date)) fixed
-    putStr (showEither hh)
---         newFile = _FILE_PATH_CORRECTLY ++ iD ++ (show date) ++ ".txt"
---     do
---         n <- doesFileExist newFile
---         case n of
---             True -> prependToFile newFile (showEither hh)
---             False -> writeWithoutEsc newFile (showEither hh)
---     return ( hh)
+        maybeHH = fmap (handToHH (iD, date)) fixed
+        newFile = _FILE_PATH_CORRECTLY ++ iD ++ (show date) ++ ".txt"
+    case maybeHH of
+        Nothing -> return ()
+        Just "too many players" -> return ()
+        Just hh -> do
+                n <- doesFileExist newFile
+                case n of
+                    True -> prependToFile newFile hh
+                    False -> writeWithoutEsc newFile hh
+
+
+readHandDebug (iD, date, fileName) = do
+    r <- fmap C.pack (readFile (_FILE_PATH_JSON ++ _MONTH ++ "/" ++ fileName))
+    let decoded = (decode (r ) :: Maybe HandActionsResp)
+        fixed = fmap fixHandActions decoded
+        maybeHH = fmap (handToHH (iD, date)) fixed
+    case fixed of
+        Nothing -> return ("nothing")
+        Just (HandActions ps c1 c2 c3 c4 c5) -> return (show (  playerNames (getBlinds (head ps, last ps))))
+
+
 
 writeWithoutEsc :: String -> String -> IO ()
 writeWithoutEsc fileName contents = do
@@ -127,9 +174,8 @@ writeWithoutEsc fileName contents = do
 -- handToHH :: HandActions -> String
 handToHH  (hId, date) (HandActions ps c1 c2 c3 c4 c5) = do
     if length ps >= 3
-        then (show (length ps)) ++ " players - too many players"
-    else let sb = head $ List.filter isSB ps
-             bb = head $ List.filter isBB ps
+        then "too many players"
+    else let (sb, bb) = getBlinds (head ps, last ps)
              seat1 = head ps
              seat2 = last ps
 --              pWinners = winners ps
@@ -139,12 +185,14 @@ handToHH  (hId, date) (HandActions ps c1 c2 c3 c4 c5) = do
              riverAction = getMergedStreetActions bb sb 3
              allAction = [preFlopAction, flopAction, turnAction, riverAction]
              pTotal = List.foldl (+) 0 (fmap potTotal allAction)
-             s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (blind sb) ++ "€/" ++ show (blind bb) ++ "€) - " ++ (showDateInsideHH date)
-                 , "Table: " ++ (tableFromBB (blind bb)) ++ " 5-max (real money) Seat #" ++ (show (seatOfSB ps) ++ " is the button")
-                 , "Seat 1: " ++ (screenName seat1) ++ " (" ++ (show (stack seat1)) ++ "€)"
-                 , "Seat 2: " ++ (screenName seat2) ++ " (" ++ (show (stack seat2)) ++ "€)"
+             seat1Stack = if div pTotal 2 > stack seat1 then div pTotal 2 else stack seat1
+             seat2Stack = if div pTotal 2 > stack seat2 then div pTotal 2 else stack seat2
+             s = [ "Winamax Poker - CashGame - HandId: #" ++ hId ++ " - Holdem no limit (" ++ show (quot (blind bb) 2) ++ "€/" ++ show (blind bb) ++ "€) - " ++ (showDateInsideHH date)
+                 , "Table: " ++ (tableFromBB (blind bb)) ++ " 5-max (real money) Seat #" ++ (show (seat ps sb)) ++ " is the button"
+                 , "Seat 1: " ++ (screenName seat1) ++ " (" ++ (show seat1Stack) ++ "€)"
+                 , "Seat 2: " ++ (screenName seat2) ++ " (" ++ (show seat1Stack) ++ "€)"
                  , "*** ANTE/BLINDS ***"
-                 , (screenName sb) ++ " posts small blind " ++ (show (blind sb) ++ "€")
+                 , (screenName sb) ++ " posts " ++ (valToBlindName (blind sb)) ++ " blind " ++ (show (blind sb) ++ "€")
                  , (screenName bb) ++ " posts big blind " ++ (show (blind bb) ++ "€")
                  , "*** PRE-FLOP ***"
                  , "Dealt to " ++ (screenName (hero ps)) ++ " " ++ (hhCards (cards (hero ps)))
@@ -160,6 +208,13 @@ handToHH  (hId, date) (HandActions ps c1 c2 c3 c4 c5) = do
                  , showWinners ps pTotal
                  ]
          in removeExtraNewLines $ (concat (intersperse "\n" (List.filter (/= "") s))) ++ "\n"
+
+valToBlindName :: Integer -> String
+valToBlindName 50 = "small"
+valToBlindName 100 = "big"
+valToBlindName 20 = "small"
+valToBlindName 40 = "big"
+valToBlindName b = "ERROR!! blind is: " ++ show b
 
 reachedShowDown :: [Maybe Card] -> Bool
 reachedShowDown cs = length (catMaybes cs) == 5
@@ -187,15 +242,13 @@ showBoard cards =
     then ""
     else "Board: " ++ (showListOfMaybes cards)
 
-seat :: [Player] -> Player -> Int
-seat (x:xs:[]) p = if p == x then 1 else 2
 
 getMergedStreetActions :: Player -> Player -> Int -> Maybe [(String, ChipAction)]
 getMergedStreetActions bb sb street =
     let sbActions = playersChipActionsOfStreet sb street
         bbActions = playersChipActionsOfStreet bb street
     in if street == 0
-            then mergeMaybeList sbActions bbActions
+            then fmap (reverse . removeExtraStartingFolds . reverse ) $  mergeMaybeList sbActions bbActions
             else mergeMaybeList bbActions sbActions
 
 showStreetActions Nothing _ _ = ""
@@ -208,13 +261,18 @@ showStreetActions _ _ _ = ""
 
 showListOfMaybes :: Show a => [Maybe a] -> String
 showListOfMaybes mbs = "[" ++ (concat (intersperse " " ((fmap show) (catMaybes mbs)))) ++ "]"
+
 showMaybe :: Show a => Maybe a -> String
 showMaybe Nothing = ""
 showMaybe (Just a) = show a
 
-showEither :: (Show a, Show b) => Either b a -> String
-showEither (Left s) = show s
-showEither (Right a) = show a
+stringMaybe :: Maybe String -> String
+stringMaybe Nothing = ""
+stringMaybe (Just a) = a
+
+showEither :: Either String String -> String
+showEither (Left s) = s
+showEither (Right a) = a
 
 mergeMaybeList :: Maybe [a] -> Maybe [a] -> Maybe [a]
 mergeMaybeList Nothing _ = Nothing
@@ -229,18 +287,10 @@ merge (x:xs) (y:ys) = x : y : merge xs ys
 
 prependToFile file str = do
     contents <- readFile file
-    let l = length contents
-    do
-        handle <- openFile file WriteMode
-        hPutStr handle (str ++ "\n\n\n\n\n\n\n\n" ++ contents)
-        hClose handle
---     length contents `seq` (I.writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
--- prependToFile file str = do
---     contents <- readFile file
---     length contents `seq` (I.writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
+    length contents `seq` (writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
 
 main :: IO ()
-main = undefined
+main = writeLatest25Hands
 -- main = do
 --     h <- readHand
 --     case h of
