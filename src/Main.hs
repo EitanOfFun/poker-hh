@@ -39,12 +39,12 @@ import Control.Monad
 
 -- _PARSE_NEW_ACCESS_TOKEN_AFTER = "var apiUrl = \"app/index.php?accessToken=\" + \""
 _BASE_URL = "https://www.turngs.com/games/poker/plugins/log/app/index.php?accessToken="
-_ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiIxMDkuNjcuMTQ5LjE5NiIsImZ1bGxBY2Nlc3MiOnRydWUsImV4cCI6MTQ5NzExMDIwM30.S8N1uGmpXDWnvUUFMS8DWBw-qSlyxCJ_f5kQvFb50EM"
+_ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiI3OS4xNzkuNTEuMjExIiwiZnVsbEFjY2VzcyI6dHJ1ZSwiZXhwIjoxNDk4MzEyNjM2fQ.ZvqBseakZQ0GOOmRVUwwKCSJmxP4MjkWSJ27N2Hr2O4"
 _URL_ID_LIST = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=list"
 _URL_HAND_ACTIONS = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=detay&id="
 _FILE_PATH_JSON = "database/hh-json/"
 _FILE_PATH_CORRECTLY = _FILE_PATH_CORRECTLY_PROD
-_FILE_PATH_CORRECTLY_PROD = "database/processed-correctly/" ++ _MONTH ++ "/"
+_FILE_PATH_CORRECTLY_PROD = "database/processed-correctly/new/" ++ _MONTH ++ "/"
 _FILE_PATH_CORRECTLY_TEST = "database/hh-json/test/" ++ _TEST ++ "/"
 _FILE_PATH_ERRORS = "database/processed-errors/"
 
@@ -117,17 +117,48 @@ writeHandActionsUnparsedJSON hID =
                 r <- get (_URL_HAND_ACTIONS ++ (HandID.handID hID))
                 C.writeFile (file) (r ^. responseBody)
 
--- writeHandActions :: HandID -> IO ()
--- writeHandActions hID =
---     let file = _FILE_PATH_JSON ++ (HandID.handID hID) ++(HandID.label (fixHandID hID)) ++  ".txt"
---     in do
---         n <- doesFileExist (file)
---         case n of
---             True -> return ()
---             False -> do
---                 r <- get (_URL_HAND_ACTIONS ++ (HandID.handID hID))
---                 C.writeFile (file) (r ^. responseBody)
 
+
+
+
+-- ******* changes
+writeHandActions :: HandID -> IO ()
+writeHandActions hID =
+    let rawJSONfile = _FILE_PATH_JSON ++ "new/" ++ (HandID.handID hID) ++(HandID.label (fixHandID hID)) ++  ".txt"
+        idDateFileName = (HandID.handID hID, parseTempFileNameDate rawJSONfile)
+    in do
+        n <- doesFileExist (rawJSONfile)
+        case n of
+            True -> return ()
+            False -> do
+                r <- get (_URL_HAND_ACTIONS ++ (HandID.handID hID))
+                C.writeFile (rawJSONfile) (r ^. responseBody)
+                readHandNew idDateFileName (r ^. responseBody)
+
+readHandNew (iD, date) r = do
+    let decoded = (decode (r ) :: Maybe HandActionsResp)
+        fixed = fmap fixHandActions decoded
+        maybeHH = fmap (handToHH (iD, date)) fixed
+        newFile = _FILE_PATH_CORRECTLY ++ iD ++ (show date) ++ ".txt"
+    case maybeHH of
+        Nothing -> return ()
+        Just "too many players" -> return ()
+        Just hh -> do
+                n <- doesFileExist newFile
+                case n of
+                    True -> prependToFile newFile hh
+                    False -> writeWithoutEsc newFile hh
+
+writeLatest25HandsNew = do
+    r <-  reqLatest25HandIDs
+    case r of
+        (Just hIDs) -> (mapM_ writeHandActions hIDs)
+        _ -> return ()
+
+
+
+
+-- ******* end changes
 writeLatest25Hands = do
     r <-  reqLatest25HandIDs
     case r of
@@ -203,7 +234,7 @@ handToHH  (hId, date) (HandActions ps c1 c2 c3 c4 c5) = do
                  , (showStreetActions riverAction [c1,c2,c3,c4,c5] 3)
                  , if reachedShowDown [c1,c2,c3,c4,c5] then "" else (screenName (head (winners ps))) ++ " collected " ++ (show pTotal) ++ "€ from pot"
                  , "*** SUMMARY ***"
-                 , "Total pot " ++ (show pTotal) ++ "€ | Rake 0€"
+                 , "Total pot " ++ (show pTotal) ++ "€ | No rake"
                  , showBoard [c1,c2,c3,c4,c5]
                  , showWinners ps pTotal
                  ]
@@ -228,13 +259,27 @@ removeExtraNewLines [] = []
 
 showWinners :: [Player] -> Integer -> String
 showWinners ps pTotal =
-    let won = winners ps
+    let sorted = sortWinnerLast ps
         f = (\p ->
-            "Seat " ++ (show (seat ps p)) ++ ": "
-             ++ (screenName p) ++ " showed " ++ (hhCards (cards p)) ++
-             " and won " ++ (show (div pTotal (toInteger (length won)))) ++ "€")
-    in concat ( intersperse "\n" (fmap f won))
+            if (not (cardsKnown (cards p)))
+                then if (won p)
+                        then "Seat " ++ (show (seat ps p)) ++ ": " ++ (screenName p) ++ " won " ++ (show pTotal) ++ "€"
+                        else ""
+                else
+                    "Seat " ++ (show (seat ps p)) ++ ": " ++ (screenName p) ++ " showed " ++ (hhCards (cards p)) ++
+                     (if (won p)
+                        then " and won " ++ (show (div pTotal (toInteger (length (winners sorted))))) ++ "€"
+                        else ""))
+    in concat ( intersperse "\n" (List.filter (/= "")(fmap f sorted)))
 
+-- showWinners :: [Player] -> Integer -> String
+-- showWinners ps pTotal =
+--     let won = winners ps
+--         f = (\p ->
+--             "Seat " ++ (show (seat ps p)) ++ ": "
+--              ++ (screenName p) ++ " showed " ++ (hhCards (cards p)) ++
+--              " and won " ++ (show (div pTotal (toInteger (length won)))) ++ "€")
+--     in concat ( intersperse "\n" (fmap f won))
 
 showBoard :: [Maybe Card] -> String
 showBoard cards =
@@ -251,6 +296,9 @@ getMergedStreetActions bb sb street =
             then fmap (reverse . removeExtraStartingFolds . reverse ) $  mergeMaybeList sbActions bbActions
             else mergeMaybeList bbActions sbActions
 
+showStreetActions Nothing cards 1 = if (isJust $ last cards) then "*** FLOP *** " ++ (hhCards cards) ++ "\n" else ""
+showStreetActions Nothing cards 2 = if (isJust $ last cards) then "*** TURN *** " ++ (hhCards cards) ++ "\n" else ""
+showStreetActions Nothing cards 3 = if (isJust $ last cards) then "*** RIVER *** " ++ (hhCards cards) ++ "\n" else ""
 showStreetActions Nothing _ _ = ""
 showStreetActions (Just m) _ 0 = showStreetChipActions (drop 2 m)
 showStreetActions (Just m) cards 1 = "*** FLOP *** " ++ (hhCards cards) ++ "\n" ++ (showStreetChipActions m)
@@ -290,7 +338,7 @@ prependToFile file str = do
     length contents `seq` (writeFile file $ (str ++ "\n\n\n\n\n\n\n\n" ++ contents))
 
 main :: IO ()
-main = writeLatest25Hands
+main = writeLatest25HandsNew
 -- main = do
 --     h <- readHand
 --     case h of

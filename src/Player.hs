@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Lens
 import Data.List as L
 import Data.Map as Map
+import Data.Maybe
 _HERO_ID = "1728183"
 
 data PlayerResp = PlayerResp
@@ -124,6 +125,8 @@ lastActionsOnEveryStreetPostFlop ps =
         lastActionList = fmap (\ca -> take 1 (reverse ca)) cas
     in concat lastActionList
 
+cardsKnown :: [Maybe Card] -> Bool
+cardsKnown = any isJust
 
 blind :: Player -> Integer
 blind p = case head (head (chipActions p)) of
@@ -156,6 +159,10 @@ notHero ps = head (L.filter (\p -> playerID p /= _HERO_ID) ps)
 
 winners :: [Player] -> [Player]
 winners = L.filter (\p -> won p)
+
+sortWinnerLast :: [Player] -> [Player]
+sortWinnerLast (p1:p2:[]) = if (won p1) then (p2:p1:[]) else (p1:p2:[])
+sortWinnerLast ps = ps
 
 tie :: [Player] -> Bool
 tie ps = length (L.filter (\p -> won p) ps) == 2
