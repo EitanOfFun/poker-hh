@@ -3,9 +3,6 @@
 module Card where
 
 import Data.Char (isDigit)
-{--
-** CARD TYPE
--}
 
 data Card =  Card Rank Suit deriving (Eq)
 

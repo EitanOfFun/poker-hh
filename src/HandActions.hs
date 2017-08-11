@@ -2,12 +2,12 @@
 
 module HandActions where
 
-import Player
-import Card
-import Data.Aeson
-import Data.Aeson.Types as Ty
-import Control.Applicative
-import Control.Monad
+import Player (Player, PlayerResp, fixPlayer)
+import Card (Card, cardUrlToCard)
+import Data.Aeson (FromJSON, parseJSON)
+import Data.Aeson.Types (Object, Value (..), (.:))
+import Control.Monad (mzero)
+import Control.Applicative ((<$>), (<*>))
 
 data HandActionsResp = HandActionsResp
   { _players :: ![PlayerResp]

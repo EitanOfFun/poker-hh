@@ -1,11 +1,11 @@
 module TurnDate where
 
 import Prelude hiding (min)
-import HandID
+import HandID (parseTempFileNameID)
 
 -- TODO:  update these when finished processing and figure out how to automate it
 _YEAR = "2017"
-_MONTH = "07"
+_MONTH = "08"
 
 data TurnDate = TurnDate
     { year :: !String
@@ -36,16 +36,6 @@ parseTempFileNameDate fileName =
         , min = take 2 (drop 7 t)
         , sec = hexToDec (last hID)
         }
---
--- parseTempFileNameSimpleDate :: String -> String
--- parseTempFileNameSimpleDate fileName =
---     let hID = parseTempFileNameID fileName
---         t = drop 1 (dropWhile ((/=) '_') fileName)
---         day = take 2 t
---         hour = take 2 (drop 4 t)
---         min = take 2 (drop 7 t)
---         sec = hexToDec (last hID)
---     in "-" ++ _MONTH ++ "-" ++ _DAY ++ "-" ++ _YEAR
 
 hexToDec 'f' = "15"
 hexToDec 'e' = "14"
