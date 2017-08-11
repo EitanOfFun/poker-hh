@@ -2,29 +2,29 @@
 
 module HandActions where
 
-import Player (Player, PlayerResp, fixPlayer)
-import Card (Card, cardUrlToCard)
-import Data.Aeson (FromJSON, parseJSON)
-import Data.Aeson.Types (Object, Value (..), (.:))
-import Control.Monad (mzero)
-import Control.Applicative ((<$>), (<*>))
+import           Card                (Card, cardUrlToCard)
+import           Control.Applicative ((<$>), (<*>))
+import           Control.Monad       (mzero)
+import           Data.Aeson          (FromJSON, parseJSON)
+import           Data.Aeson.Types    (Object, Value (..), (.:))
+import           Player              (Player, PlayerResp, fixPlayer)
 
 data HandActionsResp = HandActionsResp
   { _players :: ![PlayerResp]
-  , _flop_0 :: !String
-  , _flop_1 :: !String
-  , _flop_2 :: !String
-  , _turn :: !String
-  , _river :: !String
+  , _flop_0  :: !String
+  , _flop_1  :: !String
+  , _flop_2  :: !String
+  , _turn    :: !String
+  , _river   :: !String
   } deriving (Show)
 
 data HandActions = HandActions
   { players :: ![Player]
-  , flop_0 :: !(Maybe Card)
-  , flop_1 :: !(Maybe Card)
-  , flop_2 :: !(Maybe Card)
-  , turn :: !(Maybe Card)
-  , river :: !(Maybe Card)
+  , flop_0  :: !(Maybe Card)
+  , flop_1  :: !(Maybe Card)
+  , flop_2  :: !(Maybe Card)
+  , turn    :: !(Maybe Card)
+  , river   :: !(Maybe Card)
   } deriving (Show, Eq)
 
 fixHandActions :: HandActionsResp -> HandActions

@@ -2,7 +2,7 @@
 
 module Card where
 
-import Data.Char (isDigit)
+import           Data.Char (isDigit)
 
 data Card =  Card Rank Suit deriving (Eq)
 
@@ -17,24 +17,24 @@ instance Show Card where
 
 instance Show Suit where
   show Diamonds = "d"
-  show Hearts = "h"
-  show Spades = "s"
-  show Clubs = "c"
+  show Hearts   = "h"
+  show Spades   = "s"
+  show Clubs    = "c"
 
 instance Show Rank where
-  show Two = "2"
+  show Two   = "2"
   show Three = "3"
-  show Four = "4"
-  show Five = "5"
-  show Six = "6"
+  show Four  = "4"
+  show Five  = "5"
+  show Six   = "6"
   show Seven = "7"
   show Eight = "8"
-  show Nine = "9"
-  show Ten = "T"
-  show Jack = "J"
+  show Nine  = "9"
+  show Ten   = "T"
+  show Jack  = "J"
   show Queen = "Q"
-  show King = "K"
-  show Ace = "A"
+  show King  = "K"
+  show Ace   = "A"
 
 
 
@@ -62,8 +62,8 @@ indexToCard i
 
 
 hhCards :: [Maybe Card] -> String
-hhCards ((Just c1):(Just c2):[]) = "[" ++ (show c1) ++ " " ++ (show c2) ++ "]"
-hhCards ((Just c1):(Just c2):(Just c3):[]) = "[" ++ (show c1) ++ " " ++ (show c2) ++ " " ++ (show c3) ++ "]"
-hhCards ((Just c1):(Just c2):(Just c3):(Just c4):[]) = "["++(show c1)++" "++(show c2)++" "++(show c3)++"]"++" ["++(show c4)++"]"
-hhCards ((Just c1):(Just c2):(Just c3):(Just c4):(Just c5):[]) = "["++(show c1)++" "++(show c2)++" "++(show c3)++" "++(show c4)++"]"++" ["++(show c5)++"]"
+hhCards [Just c1, Just c2] = "[" ++ show c1 ++ " " ++ show c2 ++ "]"
+hhCards [Just c1, Just c2, Just c3] = "[" ++ show c1 ++ " " ++ show c2 ++ " " ++ show c3 ++ "]"
+hhCards [Just c1, Just c2, Just c3, Just c4] = "["++ show c1 ++" "++ show c2 ++" "++ show c3 ++"]"++" ["++ show c4 ++"]"
+hhCards [Just c1, Just c2, Just c3, Just c4, Just c5] = "["++ show c1 ++" "++ show c2 ++" "++ show c3 ++" "++ show c4 ++"]"++" ["++ show c5 ++"]"
 hhCards _ = "[]"

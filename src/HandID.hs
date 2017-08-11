@@ -2,14 +2,14 @@
 
 module HandID where
 
-import Data.Aeson (FromJSON, parseJSON)
-import Data.Aeson.Types (Object, Value (..), Parser, withObject, (.:))
-import Control.Monad (mzero)
+import           Control.Monad    (mzero)
+import           Data.Aeson       (FromJSON, parseJSON)
+import           Data.Aeson.Types (Object, Parser, Value (..), withObject, (.:))
 
 
 data HandID = HandID
   { handID :: !String
-  , label :: !String
+  , label  :: !String
   } deriving (Show, Eq)
 
 instance FromJSON HandID where
@@ -19,27 +19,27 @@ instance FromJSON HandID where
    parseJSON _ = mzero
 
 parseHandIDs :: Value -> Parser [HandID]
-parseHandIDs = withObject "HandIDs" $ \o -> do
+parseHandIDs = withObject "HandIDs" $ \o ->
   o .: "data"
 
 fixHandID :: HandID -> HandID
 fixHandID (HandID h1 h2) = HandID {
     handID = h1
-  , label = "_" ++ (fmap replaceBadCharWith_ h2)
+  , label = "_" ++ fmap replaceBadCharWith_ h2
 }
 
 replaceBadCharWith_ ' ' = '_'
 replaceBadCharWith_ '(' = '_'
 replaceBadCharWith_ ')' = '_'
 replaceBadCharWith_ ':' = '_'
-replaceBadCharWith_ c = c
+replaceBadCharWith_ c   = c
 
 parseTempFileNameID :: FilePath -> String
-parseTempFileNameID = takeWhile ((/=) '_')
+parseTempFileNameID = takeWhile ('_' /=)
 
 --
 --
 tableFromBB :: Integer -> String
 tableFromBB 100 = "'BigDog-Advanced1'"
-tableFromBB 40 = "'SuperWhales-Advanced2'"
-tableFromBB _ = "'lowStakes'"
+tableFromBB 40  = "'SuperWhales-Advanced2'"
+tableFromBB _   = "'lowStakes'"

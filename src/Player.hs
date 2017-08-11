@@ -128,7 +128,7 @@ cardsKnown = any isJust
 blind :: Player -> Integer
 blind p = case head (head (chipActions p)) of
     (Blind i) -> i
-    _         -> (-1)
+    _         -> -1
 
 isSB :: Player -> Bool
 isSB p = case head (head (chipActions p)) of
@@ -143,10 +143,10 @@ isBB p = case head (head (chipActions p)) of
     _            -> False
 
 screenName :: Player -> String
-screenName p = (name p) ++ "_" ++ (playerID p)
+screenName p = name p ++ "_" ++ playerID p
 
 seat :: [Player] -> Player -> Int
-seat (x:xs:[]) p = if p == x then 1 else 2
+seat [x,_] p = if p == x then 1 else 2
 
 hero :: [Player] -> Player
 hero ps = head (L.filter (\p -> playerID p == _HERO_ID) ps)
@@ -155,14 +155,14 @@ notHero :: [Player] -> Player
 notHero ps = head (L.filter (\p -> playerID p /= _HERO_ID) ps)
 
 winners :: [Player] -> [Player]
-winners = L.filter (\p -> won p)
+winners = L.filter won
 
 sortWinnerLast :: [Player] -> [Player]
-sortWinnerLast (p1:p2:[]) = if (won p1) then (p2:p1:[]) else (p1:p2:[])
-sortWinnerLast ps         = ps
+sortWinnerLast [p1, p2] = if won p1 then [p2, p1] else [p1, p2]
+sortWinnerLast ps       = ps
 
 tie :: [Player] -> Bool
-tie ps = length (L.filter (\p -> won p) ps) == 2
+tie ps = length (L.filter won ps) == 2
 
 playersChipActionsOfStreet :: Player -> Int -> Maybe [(String, ChipAction)]
 playersChipActionsOfStreet p street
@@ -170,4 +170,4 @@ playersChipActionsOfStreet p street
     | otherwise =
         let sn = screenName p
             f = (,) sn
-        in Just (fmap f ((chipActions p) !! street ))
+        in Just (fmap f (chipActions p !! street ))
