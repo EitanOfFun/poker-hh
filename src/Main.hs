@@ -39,31 +39,21 @@ import           System.Directory           (doesFileExist, listDirectory)
 import           System.IO                  (IOMode (WriteMode), hClose,
                                              hPutStr, openFile)
 import           TurnDate                   (TurnDate, parseTempFileNameDate,
-                                             showDateInsideHH, _MONTH)
+                                             showDateInsideHH, getCurrentDate)
 import           Utils                      (merge, mergeMaybeList,
                                              mergeMaybeList, showEither,
                                              showListOfMaybes, showMaybe,
                                              stringMaybe)
 
 
--- TODO update automaticaly to new url
 
--- _CODE = "AQBqIIxEM3td2tI5zm1YbQt0UGndDAryTxuRJ9TqJVl-cfuiO95z0UEooGtZ_w1gHBQYjivivv8LovyNqsGgmXgfYBAUZacGn7rGn_QREUTk0Sh6PqHwSL9jZ__sza8ZfWz4_4Is4SFPmPDin1A0QEmdwD948rnuh8fy_KOZbnXe3j8H2PoFTs2n-S_bNFLkBe8aNzILk62Yj8FQleaf7PLkzag-phlWneSpcGtPglhTGgJSWkhlJzA89qtcO2Rp0w67EkmUowRVDXLhuS9NXvjdvxlZ4yxGG5uaN26_QM3Cou8qympYICgm2GN3GXIRvbQ&state=b8a36ff78f0c615bb998c532d934c006"
--- _PARSE_NEW_ACCESS_TOKEN_AFTER = "var apiUrl = \"app/index.php?accessToken=\" + \""
--- _URL_ACCESS_TOKEN = "https://www.turngs.com/dev/api.php"
 _BASE_URL = "https://www.turngs.com/games/poker/plugins/log/app/index.php?accessToken="
--- _ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTcyODE4MywiaXAiOiI3OS4xODAuMi4yMDAiLCJmdWxsQWNjZXNzIjp0cnVlLCJleHAiOjE0OTg3NjE3MzZ9.Nu2sjZrl7jnH4imcqcwGMD819J6plPv5glT4ZcqfzjI"
--- _URL_ID_LIST = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=list"
--- _URL_HAND_ACTIONS = _BASE_URL ++ _ACCESS_TOKEN ++ "&action=detay&id="
-_FILE_PATH_JSON = "database/hh-json/"
-_FILE_PATH_CORRECTLY = _FILE_PATH_CORRECTLY_PROD
-_FILE_PATH_CORRECTLY_PROD = "database/processed-correctly/new-new/" ++ _MONTH ++ "/"
-_FILE_PATH_CORRECTLY_TEST = "database/hh-json/test/" ++ _TEST ++ "/"
-_FILE_PATH_ERRORS = "database/processed-errors/"
-_FILE_PATH_DATABASE = "database/"
-_FILE_PATH_ACCESS_TOKEN = _FILE_PATH_DATABASE ++ "access_token.txt"
 
-_TEST = "test"
+_FILE_PATH_JSON = "database/hh-json/"
+_FILE_PATH_WINAMAX = "database/winamax/"
+_FILE_PATH_ERRORS = "database/processed-errors/"
+_FILE_PATH_ACCESS_TOKEN = "database/access_token.txt"
+
 
 testHandIDData = C.pack "[{\"id\":\"592b343035a9080c68e768f6\",\"label\":\"28 (23:33)\",\"table\":\"Learning - Advanced 3 \"},{\"id\":\"592b33ee56a9083326fc42fa\",\"label\":\"28 (23:32)\",\"table\":\"Learning - Advanced 3 \"}]"
 
@@ -89,60 +79,61 @@ reqHandActions accessToken hID = do
     return decoded
 
 
-
-readJSONFileConvertWrite = do
-   fileNs <- fmap (drop 1 . tail) (listDirectory (_FILE_PATH_JSON ++ _MONTH ++ "/" )) -- get IO list of json file from directory
-   let idDateFileName = fmap (\f -> (parseTempFileNameID f, parseTempFileNameDate f, f)) fileNs -- (id, simpledate)
-   mapM_ readHand idDateFileName
+-- assuming directory exists
+-- readJSONFileConvertWrite = do
+--     (year, month, _) <- getCurrentDate
+--     allFilesInDir <-listDirectory $ _FILE_PATH_JSON ++ show year ++ "/" ++ show month ++ "/"
+--     let idDateFileName = fmap (\f -> (parseTempFileNameID f, parseTempFileNameDate f, f)) allFilesInDir -- (id, simpledate)
+--     mapM_ readHand idDateFileName
 
 
 -- ******* changes
 writeHandActions :: String -> HandID -> IO ()
-writeHandActions accessToken hID =
-    let rawJSONfile = _FILE_PATH_JSON ++ "new/" ++ HandID.handID hID ++ HandID.label (fixHandID hID) ++  ".txt"
-        idDateFileName = (HandID.handID hID, parseTempFileNameDate rawJSONfile)
-    in do
-        n <- doesFileExist rawJSONfile
-        unless n $
-            do
-                r <- get $ _BASE_URL ++ accessToken ++ "&action=detay&id=" ++ HandID.handID hID
-                C.writeFile rawJSONfile (r ^. responseBody)
-                readHandNew idDateFileName (r ^. responseBody)
+writeHandActions accessToken hID = do
+    (year, month, day) <- getCurrentDate
+    let rawJSONfile = _FILE_PATH_JSON ++ show year ++ "/" ++ show month ++ "/" ++ HandID.handID hID ++ HandID.label (fixHandID hID) ++ ".txt"
+        idDateFileName = (HandID.handID hID, parseTempFileNameDate (year, month, day) rawJSONfile)
+    n <- doesFileExist rawJSONfile
+    unless n $
+        do
+            r <- get $ _BASE_URL ++ accessToken ++ "&action=detay&id=" ++ HandID.handID hID
+            C.writeFile rawJSONfile (r ^. responseBody)
+            readHandNew idDateFileName (r ^. responseBody)
 
 
 readHandNew (iD, date) r = do
     let decoded = decode r :: Maybe HandActionsResp
         fixed = fmap fixHandActions decoded
         maybeHH = fmap (handToHH (iD, date)) fixed
-        newFile = _FILE_PATH_CORRECTLY ++ iD ++ show date ++ ".txt"
     case maybeHH of
         Nothing -> return ()
         Just "too many players" -> return ()
         Just hh -> do
+                (year, month, _) <- getCurrentDate
+                let newFile = _FILE_PATH_WINAMAX ++ show year ++ "/" ++ show month ++ "/" ++ iD ++ show date ++ ".txt"
                 n <- doesFileExist newFile
-                if n
-                    then prependToFile newFile hh
-                    else writeWithoutEsc newFile hh
+                if n  then return () else writeWithoutEsc newFile hh
 
 
 
 
 
 
-readHand :: (String, TurnDate, String) -> IO ()
-readHand (iD, date, fileName) = do
-    r <- fmap C.pack (readFile (_FILE_PATH_JSON ++ _MONTH ++ "/" ++ fileName))
-    let decoded = decode r :: Maybe HandActionsResp
-        fixed = fmap fixHandActions decoded
-        maybeHH = fmap (handToHH (iD, date)) fixed
-        newFile = _FILE_PATH_CORRECTLY ++ iD ++ show date ++ ".txt"
-    case maybeHH of
-        Nothing -> return ()
-        Just "too many players" -> return ()
-        Just hh -> do
-                n <- doesFileExist newFile
-                if n then prependToFile newFile hh
-                     else writeWithoutEsc newFile hh
+-- readHand :: (String, TurnDate, String) -> IO ()
+-- readHand (iD, date, fileName) = do
+--     (_, month, _) <- getCurrentDate
+--     r <- fmap C.pack (readFile (_FILE_PATH_JSON ++ show month ++ "/" ++ fileName))
+--     let decoded = decode r :: Maybe HandActionsResp
+--         fixed = fmap fixHandActions decoded
+--         maybeHH = fmap (handToHH (iD, date)) fixed
+--         newFile = _FILE_PATH_CORRECTLY ++ iD ++ show date ++ ".txt"
+--     case maybeHH of
+--         Nothing -> return ()
+--         Just "too many players" -> return ()
+--         Just hh -> do
+--                 n <- doesFileExist newFile
+--                 if n then prependToFile newFile hh
+--                      else writeWithoutEsc newFile hh
 
 
 writeWithoutEsc :: String -> String -> IO ()

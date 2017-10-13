@@ -4,7 +4,7 @@ module HandID where
 
 import           Control.Monad    (mzero)
 import           Data.Aeson       (FromJSON, parseJSON)
-import           Data.Aeson.Types (Object, Parser, Value (..), withObject, (.:))
+import           Data.Aeson.Types (Parser, Value (..), withObject, (.:))
 
 
 data HandID = HandID
@@ -28,6 +28,7 @@ fixHandID (HandID h1 h2) = HandID {
   , label = "_" ++ fmap replaceBadCharWith_ h2
 }
 
+replaceBadCharWith_ :: Char -> Char
 replaceBadCharWith_ ' ' = '_'
 replaceBadCharWith_ '(' = '_'
 replaceBadCharWith_ ')' = '_'
